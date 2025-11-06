@@ -15,8 +15,4 @@ export const insertProductSchema = z.object({
     isFeatured: z.boolean(),
     banner: z.string().nullable(),
     price: currency,
-<<<<<<< HEAD
 });
-=======
-})
->>>>>>> 5e84a038ac4231666f386ab3a40d01b2d6e99942
