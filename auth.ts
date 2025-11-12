@@ -55,9 +55,10 @@ export const config = {
             return session
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async jwt({ token, user}:any) {
+        async jwt({ token, user,trigger}:any) {
             // Assign user fields to the token
             if(user){
+                token.id = user.id;
                 token.role = user.role;
                 // If user does not have email use their email
                 if(user.name === 'NO_NAME'){
@@ -69,11 +70,48 @@ export const config = {
                         data: {name: token.name}
                     })
                 }
+                if(trigger === 'signIn' || trigger === 'signUp'){
+                    const cookiesObject = await cookies();
+                    const sessionCartId = cookiesObject.get('sessionCartId')?.value;
+
+                    if(sessionCartId){
+                        const sessionCart = await prisma.cart.findFirst({
+                            where: {sessionCartId}
+                        });
+                        if(sessionCart){
+                            // delete current user cart
+                            await prisma.cart.deleteMany({
+                                where:{ userId:user.id},
+
+                            });
+
+                            //Assign new cart
+                            await prisma.cart.update({
+                                where:{id:sessionCart.id},
+                                data:{userId:user.id}
+                            });
+                        }
+                    }
+                }
             }
             return token;
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        authorized({ request,auth }: any){
+        authorized({ request, auth }: any){
+            //array of regex patterns of paths we want to protect
+            const protectedPaths = [
+                /\/shipping-address/,
+                /\/payment-method/,
+                /\/place-order/,
+                /\/profile/,
+                /\/user\/(.*)/,
+                /\/order\/(.*)/,
+                /\/admin/,
+            ];
+            //Get pathname from the req URL object
+            const {pathname} = request.nextUrl;
+            //Check if user is not authenticated and accessing a protected path
+            if(!auth && protectedPaths.some((p)=> p.test(pathname))) return false;
             // check for session cart cookie
             if(!request.cookies.get('sessionCartId')){
                 // Generate new session CartId cookie
